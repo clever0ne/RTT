@@ -134,20 +134,34 @@ static void _StoreChar(SEGGER_RTT_PRINTF_DESC * p, char c) {
 *
 *       _PrintUnsigned
 */
-static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, unsigned Base, unsigned NumDigits, unsigned FieldWidth, unsigned FormatFlags) {
+static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, unsigned Base, int NumDigits, int FieldWidth, unsigned FormatFlags) {
   static const char _aV2C[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
   unsigned Div;
   unsigned Digit;
   unsigned Number;
-  unsigned Width;
+  int Width;
   char c;
+
+  /*
+   * cppreference: If both the converted value and the precision are `0` the conversion results in no characters.
+   */
+  if (NumDigits == 0 && v == 0u) {
+    return;
+  }
+
+  /*
+   * cppreference: Precision specifies the minimum number of digits to appear. The default precision is `1`.
+   */
+  if (NumDigits < 0) {
+    NumDigits = 1;
+  }
 
   Number = v;
   Digit = 1u;
   //
   // Get actual field width
   //
-  Width = 1u;
+  Width = 1;
   while (Number >= Base) {
     Number = (Number / Base);
     Width++;
@@ -159,13 +173,13 @@ static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, uns
   // Print leading chars if necessary
   //
   if ((FormatFlags & FORMAT_FLAG_LEFT_JUSTIFY) == 0u) {
-    if (FieldWidth != 0u) {
-      if (((FormatFlags & FORMAT_FLAG_PAD_ZERO) == FORMAT_FLAG_PAD_ZERO) && (NumDigits == 0u)) {
+    if (FieldWidth != 0) {
+      if ((FormatFlags & FORMAT_FLAG_PAD_ZERO) == FORMAT_FLAG_PAD_ZERO) {
         c = '0';
       } else {
         c = ' ';
       }
-      while ((FieldWidth != 0u) && (Width < FieldWidth)) {
+      while ((FieldWidth != 0) && (Width < FieldWidth)) {
         FieldWidth--;
         _StoreChar(pBufferDesc, c);
         if (pBufferDesc->ReturnValue < 0) {
@@ -181,7 +195,7 @@ static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, uns
     // Example: If the output is 345 (Base 10), loop 2 times until Digit is 100.
     //
     while (1) {
-      if (NumDigits > 1u) {       // User specified a min number of digits to print? => Make sure we loop at least that often, before checking anything else (> 1 check avoids problems with NumDigits being signed / unsigned)
+      if (NumDigits > 1) {       // User specified a min number of digits to print? => Make sure we loop at least that often, before checking anything else (> 1 check avoids problems with NumDigits being signed / unsigned)
         NumDigits--;
       } else {
         Div = v / Digit;
@@ -207,8 +221,8 @@ static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, uns
     // Print trailing spaces if necessary
     //
     if ((FormatFlags & FORMAT_FLAG_LEFT_JUSTIFY) == FORMAT_FLAG_LEFT_JUSTIFY) {
-      if (FieldWidth != 0u) {
-        while ((FieldWidth != 0u) && (Width < FieldWidth)) {
+      if (FieldWidth != 0) {
+        while ((FieldWidth != 0) && (Width < FieldWidth)) {
           FieldWidth--;
           _StoreChar(pBufferDesc, ' ');
           if (pBufferDesc->ReturnValue < 0) {
@@ -224,33 +238,47 @@ static void _PrintUnsigned(SEGGER_RTT_PRINTF_DESC * pBufferDesc, unsigned v, uns
 *
 *       _PrintInt
 */
-static void _PrintInt(SEGGER_RTT_PRINTF_DESC * pBufferDesc, int v, unsigned Base, unsigned NumDigits, unsigned FieldWidth, unsigned FormatFlags) {
-  unsigned Width;
-  int Number;
+static void _PrintInt(SEGGER_RTT_PRINTF_DESC * pBufferDesc, int v, unsigned Base, int NumDigits, int FieldWidth, unsigned FormatFlags) {
+  int Width;
+  unsigned Number;
+
+  /*
+   * cppreference: If both the converted value and the precision are `0` the conversion results in no characters.
+   */
+  if (NumDigits == 0 && v == 0) {
+    return;
+  }
+
+  /*
+   * cppreference: Precision specifies the minimum number of digits to appear. The default precision is `1`.
+   */
+  if (NumDigits < 0) {
+    NumDigits = 1;
+  }
 
   Number = (v < 0) ? -v : v;
 
   //
   // Get actual field width
   //
-  Width = 1u;
-  while (Number >= (int)Base) {
-    Number = (Number / (int)Base);
+  Width = 1;
+  while (Number >= Base) {
+    Number = (Number / Base);
     Width++;
   }
   if (NumDigits > Width) {
     Width = NumDigits;
   }
-  if ((FieldWidth > 0u) && ((v < 0) || ((FormatFlags & FORMAT_FLAG_PRINT_SIGN) == FORMAT_FLAG_PRINT_SIGN))) {
+  if ((FieldWidth > 0) && ((v < 0) || ((FormatFlags & FORMAT_FLAG_PRINT_SIGN) == FORMAT_FLAG_PRINT_SIGN))) {
     FieldWidth--;
   }
 
   //
   // Print leading spaces if necessary
   //
-  if ((((FormatFlags & FORMAT_FLAG_PAD_ZERO) == 0u) || (NumDigits != 0u)) && ((FormatFlags & FORMAT_FLAG_LEFT_JUSTIFY) == 0u)) {
-    if (FieldWidth != 0u) {
-      while ((FieldWidth != 0u) && (Width < FieldWidth)) {
+  if (((FormatFlags & FORMAT_FLAG_PAD_ZERO) == 0u) && ((FormatFlags & FORMAT_FLAG_LEFT_JUSTIFY) == 0u)) {
+    if (FieldWidth != 0) {
+      while ((FieldWidth != 0) && (Width < FieldWidth)) {
         FieldWidth--;
         _StoreChar(pBufferDesc, ' ');
         if (pBufferDesc->ReturnValue < 0) {
@@ -268,30 +296,15 @@ static void _PrintInt(SEGGER_RTT_PRINTF_DESC * pBufferDesc, int v, unsigned Base
       _StoreChar(pBufferDesc, '-');
     } else if ((FormatFlags & FORMAT_FLAG_PRINT_SIGN) == FORMAT_FLAG_PRINT_SIGN) {
       _StoreChar(pBufferDesc, '+');
-    } else {
-
     }
+    /*
+     * Leading zeros will be printed by _PrintUnsigned
+     */
     if (pBufferDesc->ReturnValue >= 0) {
       //
-      // Print leading zeros if necessary
+      // Print number without sign
       //
-      if (((FormatFlags & FORMAT_FLAG_PAD_ZERO) == FORMAT_FLAG_PAD_ZERO) && ((FormatFlags & FORMAT_FLAG_LEFT_JUSTIFY) == 0u) && (NumDigits == 0u)) {
-        if (FieldWidth != 0u) {
-          while ((FieldWidth != 0u) && (Width < FieldWidth)) {
-            FieldWidth--;
-            _StoreChar(pBufferDesc, '0');
-            if (pBufferDesc->ReturnValue < 0) {
-              break;
-            }
-          }
-        }
-      }
-      if (pBufferDesc->ReturnValue >= 0) {
-        //
-        // Print number without sign
-        //
-        _PrintUnsigned(pBufferDesc, (unsigned)v, Base, NumDigits, FieldWidth, FormatFlags);
-      }
+      _PrintUnsigned(pBufferDesc, (unsigned)v, Base, NumDigits, FieldWidth, FormatFlags);
     }
   }
 }
@@ -323,10 +336,9 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
   char c;
   SEGGER_RTT_PRINTF_DESC BufferDesc;
   int v;
-  unsigned char PrecisionSet;
-  unsigned Precision;
+  int Precision;
   unsigned FormatFlags;
-  unsigned FieldWidth;
+  int FieldWidth;
   char acBuffer[SEGGER_RTT_PRINTF_BUFFER_SIZE];
 
   BufferDesc.pBuffer        = acBuffer;
@@ -360,37 +372,63 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
       //
       // filter out field with
       //
-      FieldWidth = 0u;
-      do {
-        c = *sFormat;
-        if ((c < '0') || (c > '9')) {
-          break;
-        }
+      FieldWidth = 0;
+      /*
+       * cppreference: In the case when `*` is used, the width is specified by an additional argument of type `int`,
+       * which appears before the argument to be converted and the argument supplying precision if one is supplied.
+       */
+      if (*sFormat == '*') {
         sFormat++;
-        FieldWidth = (FieldWidth * 10u) + ((unsigned)c - '0');
-      } while (1);
-
+        FieldWidth = va_arg(*pParamList, int);
+        /*
+         * cppreference: If the value of the argument is negative, it results with the `-` flag specified and positive field width.
+         */
+        if (FieldWidth < 0) {
+          FieldWidth = -FieldWidth;
+          FormatFlags |= FORMAT_FLAG_LEFT_JUSTIFY;
+        }
+      } else {
+        do {
+          c = *sFormat;
+          if ((c < '0') || (c > '9')) {
+            break;
+          }
+          sFormat++;
+          FieldWidth = FieldWidth * 10 + ((int)c - '0');
+        } while (1);
+      }
       //
       // Filter out precision (number of digits to display)
       //
-      PrecisionSet = 0;
-      Precision = 0u;
+      Precision = -1;
       c = *sFormat;
       if (c == '.') {
         sFormat++;
+        /*
+         * cppreference: In the case when `*` is used, the precision is specified by an additional argument of type `int`,
+         * which appears before the argument to be converted, but after the argument supplying minimum field width if one is supplied.
+         */
         if (*sFormat == '*') {
           sFormat++;
-          PrecisionSet = 1;
           Precision = va_arg(*pParamList, int);
+          /* 
+           * cppreference: If the value of this argument is negative, it is ignored.
+           */
+          if (Precision < 0) {
+            Precision = -1;
+          }
         } else {
+          /*
+           * cppreference: If neither a number nor `*` is used, the precision is taken as zero.
+           */
+          Precision = 0;
           do {
             c = *sFormat;
             if ((c < '0') || (c > '9')) {
               break;
             }
-            PrecisionSet = 1;
             sFormat++;
-            Precision = Precision * 10u + ((unsigned)c - '0');
+            Precision = Precision * 10 + ((int)c - '0');
           } while (1);
         }
       }
@@ -439,8 +477,8 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
         {
           const char * s = va_arg(*pParamList, const char *);
           if (s == NULL) {
-            s = "(NULL)";     // Print (NULL) instead of crashing or breaking, as it is more informative to the user.
-            PrecisionSet = 0; // Make sure (NULL) is printed, even when precision was set.
+            s = "(NULL)";   // Print (NULL) instead of crashing or breaking, as it is more informative to the user.
+            Precision = -1; // Make sure (NULL) is printed, even when precision was set.
           }
           do {
             c = *s;
@@ -448,7 +486,7 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
             if (c == '\0') {
               break;
             }
-            if ((PrecisionSet != 0) && (Precision == 0)) {
+            if (Precision == 0) {
               break;
             }
             _StoreChar(&BufferDesc, c);
@@ -458,7 +496,7 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
         break;
       case 'p':
         v = va_arg(*pParamList, int);
-        _PrintUnsigned(&BufferDesc, (unsigned)v, 16u, 8u, 8u, 0u);
+        _PrintUnsigned(&BufferDesc, (unsigned)v, 16u, 8, 8, 0u);
         break;
       case '%':
         _StoreChar(&BufferDesc, '%');
