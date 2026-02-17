@@ -418,12 +418,17 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
         break;
       }
       case 'd':
+      case 'i':
         v = va_arg(*pParamList, int);
         _PrintInt(&BufferDesc, v, 10u, Precision, FieldWidth, FormatFlags);
         break;
       case 'u':
         v = va_arg(*pParamList, int);
         _PrintUnsigned(&BufferDesc, (unsigned)v, 10u, Precision, FieldWidth, FormatFlags);
+        break;
+      case 'o':
+        v = va_arg(*pParamList, int);
+        _PrintUnsigned(&BufferDesc, (unsigned)v, 8u, Precision, FieldWidth, FormatFlags);
         break;
       case 'x':
       case 'X':
@@ -502,11 +507,14 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
 *          -: Left justify within the field width
 *          +: Always print sign extension for signed conversions
 *          0: Pad with 0 instead of spaces. Ignored when using '-'-flag or precision
-*        Supported conversion specifiers:
+*    (3) Supported conversion specifiers:
 *          c: Print the argument as one char
 *          d: Print the argument as a signed integer
+*          i: Print the argument as a signed integer
 *          u: Print the argument as an unsigned integer
-*          x: Print the argument as an hexadecimal integer
+*          o: Print the argument as an octal integer
+*          x: Print the argument as a hexadecimal integer
+*          X: Print the argument as a hexadecimal integer
 *          s: Print the string pointed to by the argument
 *          p: Print the argument as an 8-digit hexadecimal integer. (Argument shall be a pointer to void.)
 */
